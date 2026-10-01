@@ -1,11 +1,17 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import gsap from 'gsap'
 import Header from './components/Header'
 import FilterPills from './components/FilterPills'
 import PollCard from './components/PollCard'
 import CreateButton from './components/CreateButton'
 import CreatePollModal from './components/CreatePollModal'
-import { mockPolls } from './data/mockPolls'
+import {
+  applyPollReaction,
+  createPoll,
+  fetchPolls,
+  subscribeToPolls,
+  voteOnPoll,
+} from './lib/polls'
 import { recordPollPosted } from './utils/dailyLimit'
 
 function loadJSON(key, fallback) {
@@ -19,10 +25,11 @@ function loadJSON(key, fallback) {
 
 function App() {
   const appRef = useRef(null)
-  const [polls, setPolls] = useState(() => [
-    ...mockPolls,
-    ...loadJSON('polly:userPolls', []),
-  ])
+  const hasAnimatedEntrance = useRef(false)
+
+  const [polls, setPolls] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeSort, setActiveSort] = useState('newest')
   const [votes, setVotes] = useState(() => loadJSON('polly:votes', {}))
@@ -31,28 +38,50 @@ function App() {
   )
   const [isCreateOpen, setIsCreateOpen] = useState(false)
 
-  function handleCreatePoll({ question, options }) {
-    const newPoll = {
-      id: Date.now(),
-      question,
-      options: options.map((text, i) => ({ id: i, text, votes: 0 })),
-      upvotes: 0,
-      downvotes: 0,
-      createdAt: Date.now(),
+  useEffect(() => {
+    let active = true
+
+    fetchPolls()
+      .then((data) => {
+        if (active) setPolls(data)
+      })
+      .catch((err) => {
+        if (active) setLoadError(err.message)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+
+    const unsubscribe = subscribeToPolls({
+      onInsert: (poll) =>
+        setPolls((prev) =>
+          prev.some((p) => p.id === poll.id) ? prev : [poll, ...prev]
+        ),
+      onUpdate: (poll) =>
+        setPolls((prev) => prev.map((p) => (p.id === poll.id ? poll : p))),
+    })
+
+    return () => {
+      active = false
+      unsubscribe()
     }
-    setPolls((prev) => [newPoll, ...prev])
+  }, [])
 
-    const storedUserPolls = loadJSON('polly:userPolls', [])
-    localStorage.setItem(
-      'polly:userPolls',
-      JSON.stringify([newPoll, ...storedUserPolls])
+  async function handleCreatePoll({ question, options }) {
+    const newPoll = await createPoll({ question, options })
+    setPolls((prev) =>
+      prev.some((p) => p.id === newPoll.id) ? prev : [newPoll, ...prev]
     )
-
     recordPollPosted()
   }
 
-  function handleVote(pollId, optionId) {
+  async function handleVote(pollId, optionId) {
     if (votes[pollId] != null) return
+
+    const next = { ...votes, [pollId]: optionId }
+    setVotes(next)
+    localStorage.setItem('polly:votes', JSON.stringify(next))
+
     setPolls((prev) =>
       prev.map((p) =>
         p.id !== pollId
@@ -65,31 +94,47 @@ function App() {
             }
       )
     )
-    const next = { ...votes, [pollId]: optionId }
-    setVotes(next)
-    localStorage.setItem('polly:votes', JSON.stringify(next))
+
+    try {
+      await voteOnPoll(pollId, optionId)
+    } catch (err) {
+      console.error('Failed to record vote', err)
+    }
   }
 
-  function handleReact(pollId, direction) {
+  async function handleReact(pollId, direction) {
     const current = reactions[pollId] ?? null
     const nextReaction = current === direction ? null : direction
 
+    let deltaUp = 0
+    let deltaDown = 0
+    if (current === 'up') deltaUp -= 1
+    if (current === 'down') deltaDown -= 1
+    if (nextReaction === 'up') deltaUp += 1
+    if (nextReaction === 'down') deltaDown += 1
+
     setPolls((prev) =>
-      prev.map((p) => {
-        if (p.id !== pollId) return p
-        let { upvotes, downvotes } = p
-        if (current === 'up') upvotes -= 1
-        if (current === 'down') downvotes -= 1
-        if (nextReaction === 'up') upvotes += 1
-        if (nextReaction === 'down') downvotes += 1
-        return { ...p, upvotes, downvotes }
-      })
+      prev.map((p) =>
+        p.id !== pollId
+          ? p
+          : {
+              ...p,
+              upvotes: p.upvotes + deltaUp,
+              downvotes: p.downvotes + deltaDown,
+            }
+      )
     )
 
     const next = { ...reactions, [pollId]: nextReaction }
     if (nextReaction === null) delete next[pollId]
     setReactions(next)
     localStorage.setItem('polly:reactions', JSON.stringify(next))
+
+    try {
+      await applyPollReaction(pollId, deltaUp, deltaDown)
+    } catch (err) {
+      console.error('Failed to record reaction', err)
+    }
   }
 
   const visiblePolls = useMemo(() => {
@@ -117,6 +162,9 @@ function App() {
   }, [polls, searchQuery, activeSort])
 
   useLayoutEffect(() => {
+    if (loading || hasAnimatedEntrance.current) return
+    hasAnimatedEntrance.current = true
+
     const ctx = gsap.context(() => {
       const header = appRef.current.querySelector('.header')
       const pills = appRef.current.querySelector('.pills')
@@ -137,7 +185,7 @@ function App() {
     }, appRef)
 
     return () => ctx.revert()
-  }, [])
+  }, [loading])
 
   return (
     <div className="app" ref={appRef}>
@@ -145,7 +193,11 @@ function App() {
       <FilterPills activeSort={activeSort} onChange={setActiveSort} />
 
       <main className="feed">
-        {visiblePolls.length === 0 ? (
+        {loading ? (
+          <p className="feed__empty">Loading polls…</p>
+        ) : loadError ? (
+          <p className="feed__empty">Couldn't load polls: {loadError}</p>
+        ) : visiblePolls.length === 0 ? (
           <p className="feed__empty">No polls match your search.</p>
         ) : (
           visiblePolls.map((poll) => (

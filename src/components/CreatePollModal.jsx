@@ -9,6 +9,7 @@ function CreatePollModal({ onClose, onSubmit }) {
   const [question, setQuestion] = useState('')
   const [options, setOptions] = useState(['', ''])
   const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const backdropRef = useRef(null)
   const sheetRef = useRef(null)
@@ -57,9 +58,9 @@ function CreatePollModal({ onClose, onSubmit }) {
     setOptions((prev) => prev.filter((_, i) => i !== index))
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
-    if (limitReached) return
+    if (limitReached || isSubmitting) return
 
     const trimmedQuestion = question.trim()
     const trimmedOptions = options.map((o) => o.trim()).filter(Boolean)
@@ -73,8 +74,14 @@ function CreatePollModal({ onClose, onSubmit }) {
       return
     }
 
-    onSubmit({ question: trimmedQuestion, options: trimmedOptions })
-    animateClose(onClose)
+    setIsSubmitting(true)
+    try {
+      await onSubmit({ question: trimmedQuestion, options: trimmedOptions })
+      animateClose(onClose)
+    } catch {
+      setIsSubmitting(false)
+      setError("Couldn't post your poll. Check your connection and try again.")
+    }
   }
 
   return (
@@ -162,8 +169,12 @@ function CreatePollModal({ onClose, onSubmit }) {
 
             {error && <p className="modal-sheet__error">{error}</p>}
 
-            <button type="submit" className="modal-sheet__post">
-              Post
+            <button
+              type="submit"
+              className="modal-sheet__post"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Posting…' : 'Post'}
             </button>
           </form>
         )}
