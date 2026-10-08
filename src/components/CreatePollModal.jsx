@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { DAILY_POLL_LIMIT, getPostsRemainingToday } from '../utils/dailyLimit'
 
@@ -13,6 +13,8 @@ function CreatePollModal({ onClose, onSubmit }) {
 
   const backdropRef = useRef(null)
   const sheetRef = useRef(null)
+  const errorRef = useRef(null)
+  const prevOptionCount = useRef(2)
   const remaining = getPostsRemainingToday()
   const limitReached = remaining <= 0
 
@@ -27,7 +29,51 @@ function CreatePollModal({ onClose, onSubmit }) {
         { y: 0, opacity: 1, duration: 0.4, ease: 'power3.out' },
         '-=0.15'
       )
+
+    const items = sheetRef.current.querySelectorAll(
+      '.modal-sheet__title-input, .modal-option, .modal-sheet__add-option, .modal-sheet__post'
+    )
+    if (items.length) {
+      gsap.fromTo(
+        items,
+        { y: 14, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.4,
+          ease: 'power2.out',
+          stagger: 0.06,
+          delay: 0.2,
+          clearProps: 'opacity,transform',
+        }
+      )
+    }
   }, [])
+
+  useEffect(() => {
+    if (options.length > prevOptionCount.current) {
+      const rows = sheetRef.current.querySelectorAll('.modal-option')
+      const last = rows[rows.length - 1]
+      if (last) {
+        gsap.fromTo(
+          last,
+          { opacity: 0, y: -10, scale: 0.97 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.35, ease: 'back.out(2)' }
+        )
+      }
+    }
+    prevOptionCount.current = options.length
+  }, [options.length])
+
+  useEffect(() => {
+    if (error && errorRef.current) {
+      gsap.fromTo(
+        errorRef.current,
+        { x: -8 },
+        { x: 0, duration: 0.5, ease: 'elastic.out(1, 0.25)' }
+      )
+    }
+  }, [error])
 
   function animateClose(after) {
     gsap
@@ -167,7 +213,11 @@ function CreatePollModal({ onClose, onSubmit }) {
               </button>
             )}
 
-            {error && <p className="modal-sheet__error">{error}</p>}
+            {error && (
+              <p className="modal-sheet__error" ref={errorRef}>
+                {error}
+              </p>
+            )}
 
             <button
               type="submit"

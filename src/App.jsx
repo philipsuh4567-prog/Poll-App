@@ -37,6 +37,7 @@ function App() {
     loadJSON('polly:reactions', {})
   )
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [feedReady, setFeedReady] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -164,6 +165,7 @@ function App() {
   useLayoutEffect(() => {
     if (loading || hasAnimatedEntrance.current) return
     hasAnimatedEntrance.current = true
+    setFeedReady(true)
 
     const ctx = gsap.context(() => {
       const header = appRef.current.querySelector('.header')
@@ -194,7 +196,7 @@ function App() {
 
       <main className="feed">
         {loading ? (
-          <p className="feed__empty">Loading polls…</p>
+          <p className="feed__empty feed__loading">Loading polls…</p>
         ) : loadError ? (
           <p className="feed__empty">Couldn't load polls: {loadError}</p>
         ) : visiblePolls.length === 0 ? (
@@ -206,6 +208,7 @@ function App() {
               poll={poll}
               votedOptionId={votes[poll.id] ?? null}
               reaction={reactions[poll.id] ?? null}
+              animateOnMount={feedReady}
               onVote={handleVote}
               onReact={handleReact}
             />

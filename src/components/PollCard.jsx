@@ -6,11 +6,19 @@ function formatCount(n) {
   return String(n)
 }
 
-function PollCard({ poll, votedOptionId, reaction, onVote, onReact }) {
+function PollCard({
+  poll,
+  votedOptionId,
+  reaction,
+  animateOnMount,
+  onVote,
+  onReact,
+}) {
   const totalVotes = poll.options.reduce((sum, o) => sum + o.votes, 0)
   const hasVoted = votedOptionId != null
   const score = poll.upvotes - poll.downvotes
 
+  const cardRef = useRef(null)
   const fillRefs = useRef({})
   const pctRefs = useRef({})
   const scoreRef = useRef(null)
@@ -18,6 +26,23 @@ function PollCard({ poll, votedOptionId, reaction, onVote, onReact }) {
   const downBtnRef = useRef(null)
   const isFirstVoteEffect = useRef(true)
   const prevScore = useRef(score)
+
+  useLayoutEffect(() => {
+    if (!animateOnMount) return
+    gsap.fromTo(
+      cardRef.current,
+      { opacity: 0, y: -20, scale: 0.96 },
+      {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        duration: 0.55,
+        ease: 'back.out(1.5)',
+        clearProps: 'opacity,transform',
+      }
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useLayoutEffect(() => {
     if (!hasVoted) {
@@ -90,7 +115,7 @@ function PollCard({ poll, votedOptionId, reaction, onVote, onReact }) {
   }
 
   return (
-    <article className="poll-card">
+    <article className="poll-card" ref={cardRef}>
       <h2 className="poll-card__question">{poll.question}</h2>
 
       <div className="poll-card__options">

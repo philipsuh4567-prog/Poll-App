@@ -497,3 +497,77 @@ body {
   line-height: 1.5;
 }
 
+
+/* Hover and motion polish */
+.header__search {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.header__search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.poll-card {
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.option-bar__label {
+  transition: transform 0.2s ease;
+}
+
+.vote-btn svg {
+  transition: transform 0.15s ease;
+}
+
+@media (hover: hover) {
+  .poll-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--text) 8%, transparent);
+  }
+
+  .pill:not(.pill--active):hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .option-bar:not(:disabled):hover .option-bar__label {
+    transform: translateX(4px);
+  }
+
+  .vote-btn:hover svg {
+    transform: scale(1.15);
+  }
+
+  .modal-sheet__post:not(:disabled):hover {
+    filter: brightness(1.06);
+  }
+
+  .modal-sheet__close:hover {
+    color: var(--text);
+  }
+}
+
+.feed__loading {
+  animation: feed-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes feed-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
