@@ -1,7 +1,14 @@
 function Header({ searchQuery, onSearchChange }) {
   return (
     <header className="header">
-      <h1 className="header__logo">Polly</h1>
+      <h1 className="header__logo">
+        <img
+          src={`${import.meta.env.BASE_URL}logo-64.png`}
+          alt="Polly"
+          width="36"
+          height="36"
+        />
+      </h1>
       <div className="header__search">
         <svg
           className="header__search-icon"
@@ -23,10 +30,10 @@ function Header({ searchQuery, onSearchChange }) {
         <input
           type="search"
           inputMode="search"
-          placeholder="Search polls"
+          placeholder="Search polly"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          aria-label="Search polls"
+          aria-label="Search polly"
         />
       </div>
     </header>
