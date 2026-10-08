@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 import gsap from 'gsap'
+import AddToHomeButton from './AddToHomeButton'
 
 const SORT_OPTIONS = [
   { key: 'newest', label: 'Newest' },
@@ -48,23 +49,26 @@ function FilterPills({ activeSort, onChange }) {
   }
 
   return (
-    <div className="pills" role="tablist" aria-label="Sort polls" ref={containerRef}>
+    <div className="pills" ref={containerRef}>
       <span className="pills__indicator" ref={indicatorRef} aria-hidden="true" />
-      {SORT_OPTIONS.map((opt) => (
-        <button
-          key={opt.key}
-          ref={(el) => (btnRefs.current[opt.key] = el)}
-          type="button"
-          role="tab"
-          aria-selected={activeSort === opt.key}
-          className={
-            'pill' + (activeSort === opt.key ? ' pill--active' : '')
-          }
-          onClick={(e) => handleClick(opt.key, e.currentTarget)}
-        >
-          {opt.label}
-        </button>
-      ))}
+      <div className="pills__tabs" role="tablist" aria-label="Sort polls">
+        {SORT_OPTIONS.map((opt) => (
+          <button
+            key={opt.key}
+            ref={(el) => (btnRefs.current[opt.key] = el)}
+            type="button"
+            role="tab"
+            aria-selected={activeSort === opt.key}
+            className={
+              'pill' + (activeSort === opt.key ? ' pill--active' : '')
+            }
+            onClick={(e) => handleClick(opt.key, e.currentTarget)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      <AddToHomeButton />
     </div>
   )
 }
