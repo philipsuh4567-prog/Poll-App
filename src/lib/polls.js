@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient'
 
+const FEED_LIMIT = 100
+
 function mapRow(row) {
   return {
     id: row.id,
@@ -16,6 +18,7 @@ export async function fetchPolls() {
     .from('polls')
     .select('*')
     .order('created_at', { ascending: false })
+    .limit(FEED_LIMIT)
 
   if (error) throw error
   return data.map(mapRow)

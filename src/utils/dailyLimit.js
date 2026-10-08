@@ -1,8 +1,12 @@
+import { saveJSON } from './storage'
+
 const STORAGE_KEY = 'polly:dailyPosts'
 export const DAILY_POLL_LIMIT = 3
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 function read() {
@@ -22,6 +26,6 @@ export function getPostsRemainingToday() {
 export function recordPollPosted() {
   const state = read()
   state.count += 1
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  saveJSON(STORAGE_KEY, state)
   return Math.max(0, DAILY_POLL_LIMIT - state.count)
 }

@@ -13,15 +13,7 @@ import {
   voteOnPoll,
 } from './lib/polls'
 import { recordPollPosted } from './utils/dailyLimit'
-
-function loadJSON(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
-}
+import { loadJSON, saveJSON } from './utils/storage'
 
 function App() {
   const appRef = useRef(null)
@@ -40,11 +32,24 @@ function App() {
   const [feedReady, setFeedReady] = useState(false)
 
   useEffect(() => {
+    saveJSON('polly:votes', votes)
+  }, [votes])
+
+  useEffect(() => {
+    saveJSON('polly:reactions', reactions)
+  }, [reactions])
+
+  useEffect(() => {
     let active = true
 
     fetchPolls()
       .then((data) => {
-        if (active) setPolls(data)
+        if (!active) return
+        // Realtime events that arrived mid-fetch are newer than this snapshot.
+        setPolls((prev) => {
+          const known = new Set(prev.map((p) => p.id))
+          return [...prev, ...data.filter((p) => !known.has(p.id))]
+        })
       })
       .catch((err) => {
         if (active) setLoadError(err.message)
@@ -79,9 +84,7 @@ function App() {
   async function handleVote(pollId, optionId) {
     if (votes[pollId] != null) return
 
-    const next = { ...votes, [pollId]: optionId }
-    setVotes(next)
-    localStorage.setItem('polly:votes', JSON.stringify(next))
+    setVotes((prev) => ({ ...prev, [pollId]: optionId }))
 
     setPolls((prev) =>
       prev.map((p) =>
@@ -100,6 +103,25 @@ function App() {
       await voteOnPoll(pollId, optionId)
     } catch (err) {
       console.error('Failed to record vote', err)
+      setVotes((prev) => {
+        const rolledBack = { ...prev }
+        delete rolledBack[pollId]
+        return rolledBack
+      })
+      setPolls((prev) =>
+        prev.map((p) =>
+          p.id !== pollId
+            ? p
+            : {
+                ...p,
+                options: p.options.map((o) =>
+                  o.id === optionId
+                    ? { ...o, votes: Math.max(0, o.votes - 1) }
+                    : o
+                ),
+              }
+        )
+      )
     }
   }
 
@@ -126,15 +148,33 @@ function App() {
       )
     )
 
-    const next = { ...reactions, [pollId]: nextReaction }
-    if (nextReaction === null) delete next[pollId]
-    setReactions(next)
-    localStorage.setItem('polly:reactions', JSON.stringify(next))
+    setReactions((prev) => {
+      const next = { ...prev, [pollId]: nextReaction }
+      if (nextReaction === null) delete next[pollId]
+      return next
+    })
 
     try {
       await applyPollReaction(pollId, deltaUp, deltaDown)
     } catch (err) {
       console.error('Failed to record reaction', err)
+      setPolls((prev) =>
+        prev.map((p) =>
+          p.id !== pollId
+            ? p
+            : {
+                ...p,
+                upvotes: p.upvotes - deltaUp,
+                downvotes: p.downvotes - deltaDown,
+              }
+        )
+      )
+      setReactions((prev) => {
+        const rolledBack = { ...prev }
+        if (current === null) delete rolledBack[pollId]
+        else rolledBack[pollId] = current
+        return rolledBack
+      })
     }
   }
 

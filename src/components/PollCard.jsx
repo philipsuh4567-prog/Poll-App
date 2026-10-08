@@ -2,8 +2,13 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import gsap from 'gsap'
 
 function formatCount(n) {
-  if (n >= 1000) return (n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0) + 'k'
-  return String(n)
+  const abs = Math.abs(n)
+  if (abs < 1000) return String(n)
+  const thousands = Math.floor(abs / 100) / 10
+  const text = Number.isInteger(thousands)
+    ? String(thousands)
+    : thousands.toFixed(1)
+  return (n < 0 ? '-' : '') + text + 'k'
 }
 
 function PollCard({
@@ -24,8 +29,11 @@ function PollCard({
   const scoreRef = useRef(null)
   const upBtnRef = useRef(null)
   const downBtnRef = useRef(null)
-  const isFirstVoteEffect = useRef(true)
+  const prevHasVoted = useRef(hasVoted)
+  const shownPct = useRef({})
+  const pctTweens = useRef({})
   const prevScore = useRef(score)
+  const votesKey = poll.options.map((o) => o.votes).join(',')
 
   useLayoutEffect(() => {
     if (!animateOnMount) return
@@ -45,11 +53,24 @@ function PollCard({
   }, [])
 
   useLayoutEffect(() => {
+    const justVoted = hasVoted && !prevHasVoted.current
+    prevHasVoted.current = hasVoted
+
     if (!hasVoted) {
-      isFirstVoteEffect.current = false
+      // Reset when a vote is rolled back (or never cast).
+      poll.options.forEach((option) => {
+        pctTweens.current[option.id]?.kill()
+        const fillEl = fillRefs.current[option.id]
+        const pctEl = pctRefs.current[option.id]
+        if (fillEl) {
+          gsap.killTweensOf(fillEl)
+          gsap.set(fillEl, { width: '0%' })
+        }
+        if (pctEl) pctEl.textContent = ''
+      })
+      shownPct.current = {}
       return
     }
-    const animate = !isFirstVoteEffect.current
 
     poll.options.forEach((option, i) => {
       const pct =
@@ -58,31 +79,40 @@ function PollCard({
       const pctEl = pctRefs.current[option.id]
       if (!fillEl || !pctEl) return
 
-      if (animate) {
-        gsap.fromTo(
-          fillEl,
-          { width: '0%' },
-          { width: pct + '%', duration: 0.7, ease: 'power3.out', delay: i * 0.05 }
-        )
-        const counter = { val: 0 }
-        gsap.to(counter, {
-          val: pct,
-          duration: 0.7,
-          delay: i * 0.05,
-          ease: 'power3.out',
-          onUpdate: () => {
-            pctEl.textContent = Math.round(counter.val) + '%'
-          },
-        })
-      } else {
+      const from = justVoted ? 0 : shownPct.current[option.id]
+      shownPct.current[option.id] = pct
+
+      if (from === undefined) {
+        // Already voted when this card mounted: show the result immediately.
         gsap.set(fillEl, { width: pct + '%' })
         pctEl.textContent = pct + '%'
+        return
       }
-    })
+      if (!justVoted && from === pct) return
 
-    isFirstVoteEffect.current = false
+      pctTweens.current[option.id]?.kill()
+      gsap.killTweensOf(fillEl)
+      const delay = justVoted ? i * 0.05 : 0
+      const duration = justVoted ? 0.7 : 0.4
+      gsap.fromTo(
+        fillEl,
+        { width: from + '%' },
+        { width: pct + '%', duration, delay, ease: 'power3.out' }
+      )
+      const counter = { val: from }
+      pctEl.textContent = from + '%'
+      pctTweens.current[option.id] = gsap.to(counter, {
+        val: pct,
+        duration,
+        delay,
+        ease: 'power3.out',
+        onUpdate: () => {
+          pctEl.textContent = Math.round(counter.val) + '%'
+        },
+      })
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasVoted])
+  }, [hasVoted, votesKey])
 
   useEffect(() => {
     if (prevScore.current !== score && scoreRef.current) {

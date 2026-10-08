@@ -83,6 +83,7 @@ function CreatePollModal({ onClose, onSubmit }) {
   }
 
   function handleClose() {
+    if (isSubmitting) return
     animateClose(onClose)
   }
 
@@ -117,6 +118,11 @@ function CreatePollModal({ onClose, onSubmit }) {
     }
     if (trimmedOptions.length < MIN_OPTIONS) {
       setError('Add at least 2 answer choices.')
+      return
+    }
+    const distinct = new Set(trimmedOptions.map((o) => o.toLowerCase()))
+    if (distinct.size !== trimmedOptions.length) {
+      setError('Each answer choice needs to be different.')
       return
     }
 
