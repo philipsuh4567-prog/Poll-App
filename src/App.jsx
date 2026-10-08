@@ -5,6 +5,7 @@ import FilterPills from './components/FilterPills'
 import PollCard from './components/PollCard'
 import CreateButton from './components/CreateButton'
 import CreatePollModal from './components/CreatePollModal'
+import LoadingScreen from './components/LoadingScreen'
 import {
   applyPollReaction,
   createPoll,
@@ -30,6 +31,8 @@ function App() {
   )
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [feedReady, setFeedReady] = useState(false)
+  const [revealed, setRevealed] = useState(false)
+  const [splashDone, setSplashDone] = useState(false)
 
   useEffect(() => {
     saveJSON('polly:votes', votes)
@@ -203,7 +206,7 @@ function App() {
   }, [polls, searchQuery, activeSort])
 
   useLayoutEffect(() => {
-    if (loading || hasAnimatedEntrance.current) return
+    if (loading || !revealed || hasAnimatedEntrance.current) return
     hasAnimatedEntrance.current = true
     setFeedReady(true)
 
@@ -227,44 +230,53 @@ function App() {
     }, appRef)
 
     return () => ctx.revert()
-  }, [loading])
+  }, [loading, revealed])
 
   return (
-    <div className="app" ref={appRef}>
-      <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-      <FilterPills activeSort={activeSort} onChange={setActiveSort} />
-
-      <main className="feed">
-        {loading ? (
-          <p className="feed__empty feed__loading">Loading polls…</p>
-        ) : loadError ? (
-          <p className="feed__empty">Couldn't load polls: {loadError}</p>
-        ) : visiblePolls.length === 0 ? (
-          <p className="feed__empty">No polls match your search.</p>
-        ) : (
-          visiblePolls.map((poll) => (
-            <PollCard
-              key={poll.id}
-              poll={poll}
-              votedOptionId={votes[poll.id] ?? null}
-              reaction={reactions[poll.id] ?? null}
-              animateOnMount={feedReady}
-              onVote={handleVote}
-              onReact={handleReact}
-            />
-          ))
-        )}
-      </main>
-
-      <CreateButton onClick={() => setIsCreateOpen(true)} />
-
-      {isCreateOpen && (
-        <CreatePollModal
-          onClose={() => setIsCreateOpen(false)}
-          onSubmit={handleCreatePoll}
+    <>
+      {!splashDone && (
+        <LoadingScreen
+          ready={!loading}
+          onReveal={() => setRevealed(true)}
+          onDone={() => setSplashDone(true)}
         />
       )}
-    </div>
+      <div className="app" ref={appRef} inert={!revealed}>
+        <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+        <FilterPills activeSort={activeSort} onChange={setActiveSort} />
+
+        <main className="feed">
+          {loading ? (
+            <p className="feed__empty feed__loading">Loading polls…</p>
+          ) : loadError ? (
+            <p className="feed__empty">Couldn't load polls: {loadError}</p>
+          ) : visiblePolls.length === 0 ? (
+            <p className="feed__empty">No polls match your search.</p>
+          ) : (
+            visiblePolls.map((poll) => (
+              <PollCard
+                key={poll.id}
+                poll={poll}
+                votedOptionId={votes[poll.id] ?? null}
+                reaction={reactions[poll.id] ?? null}
+                animateOnMount={feedReady}
+                onVote={handleVote}
+                onReact={handleReact}
+              />
+            ))
+          )}
+        </main>
+
+        <CreateButton onClick={() => setIsCreateOpen(true)} />
+
+        {isCreateOpen && (
+          <CreatePollModal
+            onClose={() => setIsCreateOpen(false)}
+            onSubmit={handleCreatePoll}
+          />
+        )}
+      </div>
+    </>
   )
 }
 

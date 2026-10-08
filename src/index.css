@@ -654,3 +654,106 @@ body {
   font-weight: 500;
   color: var(--text-muted);
 }
+
+/* Loading screen */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  background: linear-gradient(
+    180deg,
+    #f7ecd0 0%,
+    #f5dcae 45%,
+    #f0c48a 72%,
+    #e9ab6c 100%
+  );
+}
+
+.splash__column {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  height: 100%;
+}
+
+.splash__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.splash__brand {
+  position: absolute;
+  top: 9%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.splash__logo {
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(60, 40, 10, 0.22);
+}
+
+.splash__word {
+  display: flex;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  font-size: 44px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #2f3b2a;
+}
+
+.splash__letter {
+  display: inline-block;
+}
+
+.splash__status {
+  position: absolute;
+  top: calc(9% + 176px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.splash__msgs {
+  position: relative;
+  width: 100%;
+  height: 18px;
+}
+
+.splash__msg {
+  position: absolute;
+  inset: 0;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #4a5a3c;
+}
+
+.splash__bar {
+  width: 120px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(47, 59, 42, 0.18);
+  overflow: hidden;
+}
+
+.splash__bar-fill {
+  height: 100%;
+  background: #6f8f5c;
+  transform-origin: left center;
+}
