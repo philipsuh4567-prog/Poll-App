@@ -2,7 +2,29 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 
 const LETTERS = 'Polly'.split('')
-const TOTAL_SECONDS = 4.6
+const TOTAL_SECONDS = 4.4
+
+// Speed streaks and cloud smears racing upward. Deterministic so renders match.
+const STREAKS = Array.from({ length: 24 }, (_, i) => ({
+  x: -150 + ((i * 31.7) % 700),
+  w: 1.6 + (i % 4) * 1.1,
+  h: 70 + ((i * 53) % 200),
+  dur: 0.45 + (i % 5) * 0.09,
+  phase: (i * 0.37) % 1,
+}))
+
+const CLOUDS = Array.from({ length: 7 }, (_, i) => ({
+  cx: -60 + ((i * 97) % 520),
+  rx: 46 + (i % 3) * 22,
+  ry: 14 + (i % 2) * 10,
+  dur: 1.1 + (i % 4) * 0.18,
+  phase: (i * 0.29) % 1,
+}))
+
+// World coordinates match the logo (0-256). The box sits still; the camera
+// follows the falling check, then pulls back to frame the finished logo.
+const CHECK_CENTER_Y = 98
+const FINAL_FOCUS_Y = 134
 
 function LoadingScreen({ ready, onReveal, onDone }) {
   const rootRef = useRef(null)
@@ -15,54 +37,98 @@ function LoadingScreen({ ready, onReveal, onDone }) {
     ).matches
 
     const ctx = gsap.context(() => {
-      gsap.set('.splash__sun', { y: 130 })
-      gsap.set('.splash__glow', { opacity: 0, transformOrigin: '50% 50%', scale: 0.6 })
-      gsap.set('.splash__hill', { y: 50, opacity: 0 })
-      gsap.set('.splash__cypress', { scaleY: 0, transformOrigin: '50% 100%' })
-      gsap.set('.splash__villa', { y: 14, opacity: 0 })
-      gsap.set('.splash__vine', { strokeDashoffset: 1 })
-      gsap.set('.splash__bird', { x: -40, opacity: 0 })
-      gsap.set('.splash__logo', { y: -24, opacity: 0, scale: 0.8 })
-      gsap.set('.splash__letter', { y: 18, opacity: 0 })
-      gsap.set('.splash__msg', { opacity: 0 })
-      gsap.set('.splash__bar-fill', { scaleX: 0 })
+      const root = rootRef.current
+      const camera = root.querySelector('.splash__camera')
+      const checkMove = root.querySelector('.splash__check-move')
+      const cam = { s: 2.4, off: -440, w: 0 }
+
+      const apply = () => {
+        const tracking = CHECK_CENTER_Y + cam.off
+        const fy = tracking + (FINAL_FOCUS_Y - tracking) * cam.w
+        camera.setAttribute(
+          'transform',
+          `translate(200 265) scale(${cam.s}) translate(-124 ${-fy})`
+        )
+        checkMove.setAttribute('transform', `translate(0 ${cam.off})`)
+      }
+      apply()
+
+      gsap.set('.splash__letter', { yPercent: 115 })
+      gsap.set('.splash__dots', { opacity: 0 })
+      gsap.set('.splash__ring', { opacity: 0, svgOrigin: '128 137' })
+
+      const speedTweens = []
+      const addRacer = (el, travel, dur, phase) => {
+        speedTweens.push(
+          gsap
+            .to(el, { y: -travel, duration: dur, ease: 'none', repeat: -1 })
+            .progress(phase)
+        )
+      }
+      root
+        .querySelectorAll('.splash__streak')
+        .forEach((el, i) => addRacer(el, 1300, STREAKS[i].dur, STREAKS[i].phase))
+      root
+        .querySelectorAll('.splash__cloud')
+        .forEach((el, i) => addRacer(el, 1300, CLOUDS[i].dur, CLOUDS[i].phase))
 
       const tl = gsap.timeline({
         defaults: { ease: 'power3.out' },
+        onUpdate: apply,
         onComplete: () => setMinDone(true),
       })
 
-      tl.to('.splash__sun', { y: 0, duration: 2.2, ease: 'power2.out' }, 0.1)
-        .to('.splash__glow', { opacity: 1, scale: 1, duration: 2.2, ease: 'power2.out' }, 0.1)
-        .to('.splash__hill', { y: 0, opacity: 1, duration: 1.1, stagger: 0.18 }, 0.15)
-        .to('.splash__cypress', { scaleY: 1, duration: 0.9, ease: 'back.out(1.4)', stagger: 0.08 }, 0.9)
-        .to('.splash__vine', { strokeDashoffset: 0, duration: 1.3, ease: 'power1.inOut', stagger: 0.18 }, 1.2)
-        .to('.splash__villa', { y: 0, opacity: 1, duration: 0.8 }, 1.5)
-        .to('.splash__window', { fill: '#f6c453', duration: 0.6 }, 2.3)
-        .to('.splash__logo', { y: 0, opacity: 1, scale: 1, duration: 0.9, ease: 'back.out(1.6)' }, 1.0)
-        .to('.splash__letter', { y: 0, opacity: 1, duration: 0.55, stagger: 0.08 }, 1.6)
-        .to('.splash__bar-fill', { scaleX: 1, duration: 4.2, ease: 'power1.inOut' }, 0.3)
-        .to('.splash__bird', { opacity: 1, duration: 0.3 }, 0.6)
-        .to('.splash__bird', { x: 470, duration: 3.8, ease: 'none', stagger: 0.4 }, 0.6)
+      // The check hangs in frame while the world rushes past, then falls.
+      tl.to(cam, { off: 0, duration: 2.1, ease: 'power1.in' }, 0)
+        .to(
+          '.splash__check-wobble',
+          {
+            rotation: 4,
+            svgOrigin: '124 98',
+            duration: 0.3,
+            yoyo: true,
+            repeat: 5,
+            ease: 'sine.inOut',
+          },
+          0
+        )
+        // The camera starts leaning toward the box before the check arrives.
+        .to(cam, { w: 0.5, s: 2.1, duration: 1.1, ease: 'power1.in' }, 1.0)
+        .to('.splash__sky', { opacity: 0, duration: 0.5, ease: 'power1.in' }, 1.6)
+        .call(() => speedTweens.forEach((t) => t.kill()), [], 2.2)
+        .to('.splash__check-wobble', { rotation: 0, svgOrigin: '124 98', duration: 0.1 }, 2.05)
+        // Landing: the box squashes, a ring ripples out.
+        .fromTo(
+          '.splash__box',
+          { scaleY: 1, svgOrigin: '128 220' },
+          { scaleY: 0.9, svgOrigin: '128 220', duration: 0.1, ease: 'power2.out' },
+          2.1
+        )
+        .to('.splash__box', { scaleY: 1, duration: 0.55, ease: 'elastic.out(1, 0.4)' }, 2.2)
+        .fromTo(
+          '.splash__ring',
+          { opacity: 0.7, scale: 0.3 },
+          { opacity: 0, scale: 1.4, duration: 0.7, ease: 'power2.out' },
+          2.1
+        )
+        // Pull back, then the word rises.
+        .to(cam, { w: 1, s: 1.1, duration: 1.1, ease: 'power2.inOut' }, 2.3)
+        .to(
+          '.splash__letter',
+          { yPercent: 0, duration: 0.7, ease: 'power3.out', stagger: 0.08 },
+          3.0
+        )
+        .to('.splash__dots', { opacity: 1, duration: 0.3 }, 3.5)
+        .to({}, { duration: 0.001 }, TOTAL_SECONDS)
 
-      gsap.utils.toArray('.splash__msg').forEach((el, i, all) => {
-        const start = 0.5 + i * 1.4
-        tl.fromTo(el, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.35 }, start)
-        if (i < all.length - 1) {
-          tl.to(el, { opacity: 0, y: -6, duration: 0.3 }, start + 1.1)
-        }
-      })
-
-      tl.to({}, { duration: 0.001 }, TOTAL_SECONDS)
-
-      gsap.to('.splash__cypress', {
-        rotation: 1.4,
-        duration: 1.9,
+      gsap.to('.splash__dot', {
+        y: -5,
+        duration: 0.35,
         yoyo: true,
         repeat: -1,
         ease: 'sine.inOut',
-        stagger: 0.17,
-        delay: 2.2,
+        stagger: 0.12,
+        delay: 3.5,
       })
 
       if (reduceMotion) tl.timeScale(4)
@@ -78,7 +144,7 @@ function LoadingScreen({ ready, onReveal, onDone }) {
     gsap
       .timeline({ onComplete: onDone })
       .to(
-        rootRef.current.querySelectorAll('.splash__brand, .splash__status'),
+        rootRef.current.querySelectorAll('.splash__brand'),
         { opacity: 0, y: -12, duration: 0.35, ease: 'power2.in' },
         0
       )
@@ -97,68 +163,96 @@ function LoadingScreen({ ready, onReveal, onDone }) {
         <svg
           className="splash__svg"
           viewBox="0 0 400 600"
-          preserveAspectRatio="xMidYMax meet"
+          preserveAspectRatio="xMidYMid meet"
           aria-hidden="true"
         >
           <defs>
-            <radialGradient id="splashSunGlow">
-              <stop offset="0" stopColor="#ffe9a8" stopOpacity="0.9" />
-              <stop offset="1" stopColor="#ffe9a8" stopOpacity="0" />
-            </radialGradient>
+            <filter
+              id="splashStreakBlur"
+              filterUnits="userSpaceOnUse"
+              x="-700"
+              y="-700"
+              width="1800"
+              height="2000"
+            >
+              <feGaussianBlur stdDeviation="0.8 9" />
+            </filter>
+            <filter
+              id="splashCloudBlur"
+              filterUnits="userSpaceOnUse"
+              x="-700"
+              y="-700"
+              width="1800"
+              height="2000"
+            >
+              <feGaussianBlur stdDeviation="8 18" />
+            </filter>
+            <clipPath id="splashSlotClip">
+              <rect x="-1000" y="-2000" width="2256" height="2137" />
+            </clipPath>
           </defs>
 
-          <circle className="splash__glow" cx="200" cy="330" r="130" fill="url(#splashSunGlow)" />
-          <circle className="splash__sun" cx="200" cy="330" r="44" fill="#f5c04e" />
-
-          <path className="splash__hill" fill="#cdd6ab" d="M-800 372 L0 378 Q90 338 180 370 T400 352 L1200 356 L1200 700 L-800 700 Z" />
-
-          <g className="splash__villa">
-            <rect x="198" y="410" width="34" height="22" fill="#ead9b0" />
-            <polygon points="196,410 215,397 234,410" fill="#c4623a" />
-            <rect x="232" y="396" width="10" height="36" fill="#e3cf9f" />
-            <polygon points="230,396 237,386 244,396" fill="#b5512e" />
-            <rect className="splash__window" x="203" y="414" width="4" height="6" fill="#5a4632" />
-            <rect className="splash__window" x="223" y="414" width="4" height="6" fill="#5a4632" />
-            <rect className="splash__window" x="235" y="402" width="4" height="6" fill="#5a4632" />
-            <path d="M211 432 V423 a4 4 0 0 1 8 0 V432 Z" fill="#6b4a32" />
+          <g className="splash__sky">
+            <g filter="url(#splashCloudBlur)">
+              {CLOUDS.map((c, i) => (
+                <ellipse
+                  key={i}
+                  className="splash__cloud"
+                  cx={c.cx}
+                  cy={850}
+                  rx={c.rx}
+                  ry={c.ry}
+                />
+              ))}
+            </g>
+            <g filter="url(#splashStreakBlur)">
+              {STREAKS.map((s, i) => (
+                <rect
+                  key={i}
+                  className="splash__streak"
+                  x={s.x}
+                  y={820}
+                  width={s.w}
+                  height={s.h}
+                  rx={s.w / 2}
+                />
+              ))}
+            </g>
           </g>
 
-          <g transform="translate(52 428) scale(0.9)"><path className="splash__cypress" d="M0 0 C-8 -16 -9 -46 0 -80 C9 -46 8 -16 0 0 Z" fill="#2f4532" /></g>
-          <g transform="translate(68 426) scale(0.7)"><path className="splash__cypress" d="M0 0 C-8 -16 -9 -46 0 -80 C9 -46 8 -16 0 0 Z" fill="#35503a" /></g>
-          <g transform="translate(338 448) scale(1)"><path className="splash__cypress" d="M0 0 C-8 -16 -9 -46 0 -80 C9 -46 8 -16 0 0 Z" fill="#2f4532" /></g>
-          <g transform="translate(354 447) scale(0.75)"><path className="splash__cypress" d="M0 0 C-8 -16 -9 -46 0 -80 C9 -46 8 -16 0 0 Z" fill="#35503a" /></g>
-
-          <path className="splash__hill" fill="#b6c595" d="M-800 424 L0 430 Q120 388 230 424 T400 408 L1200 412 L1200 700 L-800 700 Z" />
-
-          <g transform="translate(118 474) scale(1.1)"><path className="splash__cypress" d="M0 0 C-8 -16 -9 -46 0 -80 C9 -46 8 -16 0 0 Z" fill="#2a3f2d" /></g>
-          <g transform="translate(134 474) scale(0.8)"><path className="splash__cypress" d="M0 0 C-8 -16 -9 -46 0 -80 C9 -46 8 -16 0 0 Z" fill="#35503a" /></g>
-          <g transform="translate(296 498) scale(1.2)"><path className="splash__cypress" d="M0 0 C-8 -16 -9 -46 0 -80 C9 -46 8 -16 0 0 Z" fill="#2a3f2d" /></g>
-
-          <path className="splash__hill" fill="#97ac78" d="M-800 478 L0 482 Q100 444 210 474 T400 454 L1200 458 L1200 700 L-800 700 Z" />
-
-          <g fill="none" stroke="#6f8f5c" strokeWidth="1.6" strokeLinecap="round" opacity="0.7">
-            <path className="splash__vine" pathLength="1" strokeDasharray="1" d="M20 500 Q120 470 230 498" />
-            <path className="splash__vine" pathLength="1" strokeDasharray="1" d="M10 515 Q130 486 250 514" />
-            <path className="splash__vine" pathLength="1" strokeDasharray="1" d="M230 470 Q310 486 390 470" />
-          </g>
-
-          <path className="splash__hill" fill="#6f8f5c" d="M-800 534 L0 538 Q130 502 250 530 T400 518 L1200 522 L1200 700 L-800 700 Z" />
-
-          <g fill="none" stroke="#4a5238" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <path className="splash__bird" transform="translate(0 150)" d="M0 0 q5 -7 10 0 q5 -7 10 0" />
-            <path className="splash__bird" transform="translate(0 182)" d="M0 0 q5 -7 10 0 q5 -7 10 0" />
-            <path className="splash__bird" transform="translate(0 130)" d="M0 0 q5 -7 10 0 q5 -7 10 0" />
+          <g className="splash__camera">
+            <ellipse
+              className="splash__ring"
+              cx="128"
+              cy="137"
+              rx="70"
+              ry="16"
+              fill="none"
+              strokeWidth="3"
+            />
+            <g className="splash__box">
+              <rect className="splash__box-body" x="48" y="120" width="160" height="100" rx="18" />
+              <rect className="splash__slot" x="84" y="130" width="88" height="14" rx="7" />
+            </g>
+            <g clipPath="url(#splashSlotClip)">
+              <g className="splash__check-move">
+                <g className="splash__check-wobble">
+                  <path
+                    className="splash__check"
+                    d="M84 98 L124 140 L172 48"
+                    fill="none"
+                    strokeWidth="16"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    transform="rotate(-12 124 140)"
+                  />
+                </g>
+              </g>
+            </g>
           </g>
         </svg>
 
         <div className="splash__brand">
-          <img
-            className="splash__logo"
-            src={`${import.meta.env.BASE_URL}logo-256.png`}
-            alt=""
-            width="84"
-            height="84"
-          />
           <div className="splash__word" aria-hidden="true">
             {LETTERS.map((letter, i) => (
               <span key={i} className="splash__letter">
@@ -166,16 +260,10 @@ function LoadingScreen({ ready, onReveal, onDone }) {
               </span>
             ))}
           </div>
-        </div>
-
-        <div className="splash__status">
-          <div className="splash__msgs">
-            <span className="splash__msg">Polling the hills…</span>
-            <span className="splash__msg">Counting every vote…</span>
-            <span className="splash__msg">Almost ready…</span>
-          </div>
-          <div className="splash__bar">
-            <div className="splash__bar-fill" />
+          <div className="splash__dots" aria-hidden="true">
+            <span className="splash__dot" />
+            <span className="splash__dot" />
+            <span className="splash__dot" />
           </div>
         </div>
       </div>
