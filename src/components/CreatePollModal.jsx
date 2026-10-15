@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
-import { DAILY_POLL_LIMIT, getPostsRemainingToday } from '../utils/dailyLimit'
+import { DAILY_POLL_LIMIT, getPostsRemaining } from '../lib/polls'
 import { createDeck } from '../data/questions'
 
 const MIN_OPTIONS = 2
@@ -19,8 +19,22 @@ function CreatePollModal({ onClose, onSubmit }) {
   const deckRef = useRef([])
   const lastQuestionRef = useRef('')
   const prevOptionCount = useRef(2)
-  const remaining = getPostsRemainingToday()
-  const limitReached = remaining <= 0
+  const [remaining, setRemaining] = useState(null)
+  const limitReached = remaining === 0
+
+  useEffect(() => {
+    let active = true
+    getPostsRemaining()
+      .then((count) => {
+        if (active) setRemaining(count)
+      })
+      .catch(() => {
+        // Posting itself re-checks on the server and reports the problem.
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   useLayoutEffect(() => {
     gsap.set(backdropRef.current, { opacity: 0 })
@@ -156,9 +170,17 @@ function CreatePollModal({ onClose, onSubmit }) {
     try {
       await onSubmit({ question: trimmedQuestion, options: trimmedOptions })
       animateClose(onClose)
-    } catch {
+    } catch (err) {
       setIsSubmitting(false)
-      setError("Couldn't post your poll. Check your connection and try again.")
+      if (err.message === 'daily_limit_reached') {
+        setRemaining(0)
+      } else if (err.message === 'sign_in_required') {
+        setError("Couldn't verify your device. Refresh the page and try again.")
+      } else if (err.message === 'invalid_poll') {
+        setError('Check your question and answer choices, then try again.')
+      } else {
+        setError("Couldn't post your poll. Check your connection and try again.")
+      }
     }
   }
 
@@ -186,8 +208,8 @@ function CreatePollModal({ onClose, onSubmit }) {
 
         {limitReached ? (
           <p className="modal-sheet__limit">
-            You've posted {DAILY_POLL_LIMIT} polls today. Come back tomorrow
-            to post more.
+            You've posted {DAILY_POLL_LIMIT} polls in the last 24 hours. Come
+            back later to post more.
           </p>
         ) : (
           <form onSubmit={handleSubmit}>

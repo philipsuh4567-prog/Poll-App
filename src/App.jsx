@@ -13,8 +13,8 @@ import {
   subscribeToPolls,
   voteOnPoll,
 } from './lib/polls'
-import { recordPollPosted } from './utils/dailyLimit'
 import { loadJSON, saveJSON } from './utils/storage'
+import { ensureSignedIn } from './lib/auth'
 
 function App() {
   const appRef = useRef(null)
@@ -44,6 +44,11 @@ function App() {
 
   useEffect(() => {
     let active = true
+
+    // Give this browser its anonymous identity up front; writes await it too.
+    ensureSignedIn().catch((err) =>
+      console.warn('Anonymous sign-in unavailable', err.message)
+    )
 
     fetchPolls()
       .then((data) => {
@@ -94,14 +99,9 @@ function App() {
     setPolls((prev) =>
       prev.some((p) => p.id === newPoll.id) ? prev : [newPoll, ...prev]
     )
-    recordPollPosted()
   }
 
-  async function handleVote(pollId, optionId) {
-    if (votes[pollId] != null) return
-
-    setVotes((prev) => ({ ...prev, [pollId]: optionId }))
-
+  function adjustVoteCount(pollId, optionId, delta) {
     setPolls((prev) =>
       prev.map((p) =>
         p.id !== pollId
@@ -109,14 +109,26 @@ function App() {
           : {
               ...p,
               options: p.options.map((o) =>
-                o.id === optionId ? { ...o, votes: o.votes + 1 } : o
+                o.id === optionId
+                  ? { ...o, votes: Math.max(0, o.votes + delta) }
+                  : o
               ),
             }
       )
     )
+  }
+
+  async function handleVote(pollId, optionId) {
+    if (votes[pollId] != null) return
+
+    setVotes((prev) => ({ ...prev, [pollId]: optionId }))
+    adjustVoteCount(pollId, optionId, 1)
 
     try {
-      await voteOnPoll(pollId, optionId)
+      const counted = await voteOnPoll(pollId, optionId)
+      // The server already has a vote from this identity for this poll (or the
+      // poll is gone): keep the voted state but undo the optimistic count.
+      if (!counted) adjustVoteCount(pollId, optionId, -1)
     } catch (err) {
       console.error('Failed to record vote', err)
       setVotes((prev) => {
@@ -124,20 +136,7 @@ function App() {
         delete rolledBack[pollId]
         return rolledBack
       })
-      setPolls((prev) =>
-        prev.map((p) =>
-          p.id !== pollId
-            ? p
-            : {
-                ...p,
-                options: p.options.map((o) =>
-                  o.id === optionId
-                    ? { ...o, votes: Math.max(0, o.votes - 1) }
-                    : o
-                ),
-              }
-        )
-      )
+      adjustVoteCount(pollId, optionId, -1)
     }
   }
 

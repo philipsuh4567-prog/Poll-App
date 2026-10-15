@@ -1,6 +1,8 @@
 import { supabase } from './supabaseClient'
+import { ensureSignedIn } from './auth'
 
 const FEED_LIMIT = 100
+export const DAILY_POLL_LIMIT = 3
 
 function mapRow(row) {
   return {
@@ -25,28 +27,42 @@ export async function fetchPolls() {
   return data.map(mapRow)
 }
 
-export async function createPoll({ question, options }) {
-  const { data, error } = await supabase
-    .from('polls')
-    .insert({
-      question,
-      options: options.map((text, i) => ({ id: i, text, votes: 0 })),
-      upvotes: 0,
-      downvotes: 0,
-    })
-    .select()
-    .single()
+const KNOWN_ERRORS = ['daily_limit_reached', 'sign_in_required', 'invalid_poll']
 
-  if (error) throw error
-  return mapRow(data)
+// The database raises these as plain-text messages; turn them into stable codes.
+function toAppError(error) {
+  const code = KNOWN_ERRORS.find((known) => error?.message?.includes(known))
+  return new Error(code ?? 'request_failed')
 }
 
+async function identified(call) {
+  try {
+    await ensureSignedIn()
+  } catch {
+    throw new Error('sign_in_required')
+  }
+  const { data, error } = await call()
+  if (error) throw toAppError(error)
+  return data
+}
+
+export async function getPostsRemaining() {
+  return identified(() => supabase.rpc('get_posts_remaining'))
+}
+
+export async function createPoll({ question, options }) {
+  const row = await identified(() =>
+    supabase.rpc('create_poll', { p_question: question, p_options: options })
+  )
+  return mapRow(row)
+}
+
+// Resolves to false when the server didn't count the vote (already voted,
+// poll gone, or no such option).
 export async function voteOnPoll(pollId, optionId) {
-  const { error } = await supabase.rpc('increment_poll_vote', {
-    p_poll_id: pollId,
-    p_option_id: optionId,
-  })
-  if (error) throw error
+  return identified(() =>
+    supabase.rpc('cast_vote', { p_poll_id: pollId, p_option_id: optionId })
+  )
 }
 
 export async function applyPollReaction(pollId, deltaUp, deltaDown) {
