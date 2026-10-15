@@ -4,20 +4,22 @@ import gsap from 'gsap'
 const LETTERS = 'Polly'.split('')
 const TOTAL_SECONDS = 4.4
 
-// Speed streaks and cloud smears racing upward. Deterministic so renders match.
-const STREAKS = Array.from({ length: 24 }, (_, i) => ({
-  x: -150 + ((i * 31.7) % 700),
-  w: 1.6 + (i % 4) * 1.1,
-  h: 70 + ((i * 53) % 200),
-  dur: 0.45 + (i % 5) * 0.09,
+// Speed streaks and cloud smears racing upward. Plain divs with gradient
+// fills moved by transform only, so they stay on the GPU (no filters).
+// Deterministic so renders match.
+const STREAKS = Array.from({ length: 16 }, (_, i) => ({
+  left: (i * 37.3) % 100,
+  w: 2 + (i % 4) * 1.4,
+  h: 110 + ((i * 53) % 220),
+  dur: 0.5 + (i % 5) * 0.1,
   phase: (i * 0.37) % 1,
 }))
 
-const CLOUDS = Array.from({ length: 7 }, (_, i) => ({
-  cx: -60 + ((i * 97) % 520),
-  rx: 46 + (i % 3) * 22,
-  ry: 14 + (i % 2) * 10,
-  dur: 1.1 + (i % 4) * 0.18,
+const CLOUDS = Array.from({ length: 5 }, (_, i) => ({
+  left: -10 + ((i * 29) % 90),
+  w: 160 + (i % 3) * 70,
+  h: 46 + (i % 2) * 30,
+  dur: 1.1 + (i % 4) * 0.2,
   phase: (i * 0.29) % 1,
 }))
 
@@ -57,8 +59,9 @@ function LoadingScreen({ ready, onReveal, onDone }) {
       gsap.set('.splash__dots', { opacity: 0 })
       gsap.set('.splash__ring', { opacity: 0, svgOrigin: '128 137' })
 
+      const travel = window.innerHeight + 420
       const speedTweens = []
-      const addRacer = (el, travel, dur, phase) => {
+      const addRacer = (el, dur, phase) => {
         speedTweens.push(
           gsap
             .to(el, { y: -travel, duration: dur, ease: 'none', repeat: -1 })
@@ -67,10 +70,10 @@ function LoadingScreen({ ready, onReveal, onDone }) {
       }
       root
         .querySelectorAll('.splash__streak')
-        .forEach((el, i) => addRacer(el, 1300, STREAKS[i].dur, STREAKS[i].phase))
+        .forEach((el, i) => addRacer(el, STREAKS[i].dur, STREAKS[i].phase))
       root
         .querySelectorAll('.splash__cloud')
-        .forEach((el, i) => addRacer(el, 1300, CLOUDS[i].dur, CLOUDS[i].phase))
+        .forEach((el, i) => addRacer(el, CLOUDS[i].dur, CLOUDS[i].phase))
 
       const tl = gsap.timeline({
         defaults: { ease: 'power3.out' },
@@ -94,7 +97,7 @@ function LoadingScreen({ ready, onReveal, onDone }) {
         )
         // The camera starts leaning toward the box before the check arrives.
         .to(cam, { w: 0.5, s: 2.1, duration: 1.1, ease: 'power1.in' }, 1.0)
-        .to('.splash__sky', { opacity: 0, duration: 0.5, ease: 'power1.in' }, 1.6)
+        .to('.splash__speed', { opacity: 0, duration: 0.5, ease: 'power1.in' }, 1.6)
         .call(() => speedTweens.forEach((t) => t.kill()), [], 2.2)
         .to('.splash__check-wobble', { rotation: 0, svgOrigin: '124 98', duration: 0.1 }, 2.05)
         // Landing: the box squashes, a ring ripples out.
@@ -160,6 +163,23 @@ function LoadingScreen({ ready, onReveal, onDone }) {
       aria-label="Loading Polly"
     >
       <div className="splash__column">
+        <div className="splash__speed" aria-hidden="true">
+          {CLOUDS.map((c, i) => (
+            <span
+              key={`c${i}`}
+              className="splash__cloud"
+              style={{ left: `${c.left}%`, width: c.w, height: c.h }}
+            />
+          ))}
+          {STREAKS.map((st, i) => (
+            <span
+              key={`s${i}`}
+              className="splash__streak"
+              style={{ left: `${st.left}%`, width: st.w, height: st.h }}
+            />
+          ))}
+        </div>
+
         <svg
           className="splash__svg"
           viewBox="0 0 400 600"
@@ -167,58 +187,10 @@ function LoadingScreen({ ready, onReveal, onDone }) {
           aria-hidden="true"
         >
           <defs>
-            <filter
-              id="splashStreakBlur"
-              filterUnits="userSpaceOnUse"
-              x="-700"
-              y="-700"
-              width="1800"
-              height="2000"
-            >
-              <feGaussianBlur stdDeviation="0.8 9" />
-            </filter>
-            <filter
-              id="splashCloudBlur"
-              filterUnits="userSpaceOnUse"
-              x="-700"
-              y="-700"
-              width="1800"
-              height="2000"
-            >
-              <feGaussianBlur stdDeviation="8 18" />
-            </filter>
             <clipPath id="splashSlotClip">
               <rect x="-1000" y="-2000" width="2256" height="2137" />
             </clipPath>
           </defs>
-
-          <g className="splash__sky">
-            <g filter="url(#splashCloudBlur)">
-              {CLOUDS.map((c, i) => (
-                <ellipse
-                  key={i}
-                  className="splash__cloud"
-                  cx={c.cx}
-                  cy={850}
-                  rx={c.rx}
-                  ry={c.ry}
-                />
-              ))}
-            </g>
-            <g filter="url(#splashStreakBlur)">
-              {STREAKS.map((s, i) => (
-                <rect
-                  key={i}
-                  className="splash__streak"
-                  x={s.x}
-                  y={820}
-                  width={s.w}
-                  height={s.h}
-                  rx={s.w / 2}
-                />
-              ))}
-            </g>
-          </g>
 
           <g className="splash__camera">
             <ellipse
@@ -237,6 +209,17 @@ function LoadingScreen({ ready, onReveal, onDone }) {
             <g clipPath="url(#splashSlotClip)">
               <g className="splash__check-move">
                 <g className="splash__check-wobble">
+                  <g transform="translate(0 7)">
+                    <path
+                      className="splash__check-halo"
+                      d="M84 98 L124 140 L172 48"
+                      fill="none"
+                      strokeWidth="20"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      transform="rotate(-12 124 140)"
+                    />
+                  </g>
                   <path
                     className="splash__check"
                     d="M84 98 L124 140 L172 48"

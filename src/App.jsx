@@ -258,9 +258,7 @@ function App() {
         <FilterPills activeSort={activeSort} onChange={setActiveSort} />
 
         <main className="feed">
-          {loading ? (
-            <p className="feed__empty feed__loading">Loading polls…</p>
-          ) : loadError ? (
+          {!revealed || loading ? null : loadError ? (
             <p className="feed__empty">Couldn't load polls: {loadError}</p>
           ) : visiblePolls.length === 0 ? (
             <p className="feed__empty">No polls match your search.</p>

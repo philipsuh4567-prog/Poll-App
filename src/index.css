@@ -701,7 +701,7 @@ body {
   --splash-box: #6f8f5c;
   --splash-slot: #1b231b;
   --splash-check: #ffffff;
-  --splash-check-shadow: drop-shadow(0 4px 10px rgba(15, 40, 70, 0.4));
+  --splash-halo: rgba(15, 40, 70, 0.16);
   --splash-text: #1b231b;
 }
 
@@ -727,7 +727,7 @@ body {
     --splash-box: #86a872;
     --splash-slot: #0b110b;
     --splash-check: #ffffff;
-    --splash-check-shadow: none;
+    --splash-halo: transparent;
     --splash-text: #e8efe5;
   }
 }
@@ -753,7 +753,7 @@ body {
   --splash-box: #86a872;
   --splash-slot: #0b110b;
   --splash-check: #ffffff;
-  --splash-check-shadow: none;
+  --splash-halo: transparent;
   --splash-text: #e8efe5;
 }
 
@@ -765,6 +765,7 @@ body {
   display: flex;
   justify-content: center;
   overflow: hidden;
+  will-change: opacity;
   background: linear-gradient(
     180deg,
     var(--splash-sky-top) 0%,
@@ -787,12 +788,33 @@ body {
   overflow: visible;
 }
 
+.splash__speed {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .splash__streak {
-  fill: var(--splash-streak);
+  position: absolute;
+  top: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    var(--splash-streak) 35%,
+    var(--splash-streak) 65%,
+    transparent 100%
+  );
+  will-change: transform;
 }
 
 .splash__cloud {
-  fill: var(--splash-cloud);
+  position: absolute;
+  top: 100%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--splash-cloud), transparent);
+  will-change: transform;
 }
 
 .splash__box-body {
@@ -809,7 +831,10 @@ body {
 
 .splash__check {
   stroke: var(--splash-check);
-  filter: var(--splash-check-shadow);
+}
+
+.splash__check-halo {
+  stroke: var(--splash-halo);
 }
 
 .splash__brand {
