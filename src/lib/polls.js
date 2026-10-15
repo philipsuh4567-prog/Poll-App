@@ -10,6 +10,7 @@ function mapRow(row) {
     upvotes: row.upvotes,
     downvotes: row.downvotes,
     createdAt: new Date(row.created_at).getTime(),
+    expiresAt: new Date(row.expires_at).getTime(),
   }
 }
 
@@ -57,7 +58,7 @@ export async function applyPollReaction(pollId, deltaUp, deltaDown) {
   if (error) throw error
 }
 
-export function subscribeToPolls({ onInsert, onUpdate }) {
+export function subscribeToPolls({ onInsert, onUpdate, onDelete }) {
   const channel = supabase
     .channel('polls-changes')
     .on(
@@ -69,6 +70,11 @@ export function subscribeToPolls({ onInsert, onUpdate }) {
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'polls' },
       (payload) => onUpdate(mapRow(payload.new))
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'polls' },
+      (payload) => onDelete(payload.old.id)
     )
     .subscribe()
 

@@ -68,10 +68,23 @@ function App() {
         ),
       onUpdate: (poll) =>
         setPolls((prev) => prev.map((p) => (p.id === poll.id ? poll : p))),
+      onDelete: (id) => setPolls((prev) => prev.filter((p) => p.id !== id)),
     })
+
+    // Drop polls that expire while the page is open, without waiting for
+    // the server-side cleanup event.
+    const expiryTimer = setInterval(() => {
+      const now = Date.now()
+      setPolls((prev) =>
+        prev.some((p) => p.expiresAt <= now)
+          ? prev.filter((p) => p.expiresAt > now)
+          : prev
+      )
+    }, 30000)
 
     return () => {
       active = false
+      clearInterval(expiryTimer)
       unsubscribe()
     }
   }, [])
