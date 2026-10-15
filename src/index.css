@@ -757,3 +757,37 @@ body {
   background: #6f8f5c;
   transform-origin: left center;
 }
+
+/* Random question dice */
+.modal-sheet__title {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.modal-sheet__title-input {
+  margin-bottom: 0;
+  padding-right: 58px;
+}
+
+.modal-sheet__dice {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  margin-top: -18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .modal-sheet__dice:hover {
+    background: color-mix(in srgb, var(--accent) 22%, var(--accent-soft));
+  }
+}

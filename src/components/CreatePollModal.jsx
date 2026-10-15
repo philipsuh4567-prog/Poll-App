@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { DAILY_POLL_LIMIT, getPostsRemainingToday } from '../utils/dailyLimit'
+import { createDeck } from '../data/questions'
 
 const MIN_OPTIONS = 2
 const MAX_OPTIONS = 4
@@ -14,6 +15,9 @@ function CreatePollModal({ onClose, onSubmit }) {
   const backdropRef = useRef(null)
   const sheetRef = useRef(null)
   const errorRef = useRef(null)
+  const diceRef = useRef(null)
+  const deckRef = useRef([])
+  const lastQuestionRef = useRef('')
   const prevOptionCount = useRef(2)
   const remaining = getPostsRemainingToday()
   const limitReached = remaining <= 0
@@ -31,7 +35,7 @@ function CreatePollModal({ onClose, onSubmit }) {
       )
 
     const items = sheetRef.current.querySelectorAll(
-      '.modal-sheet__title-input, .modal-option, .modal-sheet__add-option, .modal-sheet__post'
+      '.modal-sheet__title, .modal-option, .modal-sheet__add-option, .modal-sheet__post'
     )
     if (items.length) {
       gsap.fromTo(
@@ -85,6 +89,28 @@ function CreatePollModal({ onClose, onSubmit }) {
   function handleClose() {
     if (isSubmitting) return
     animateClose(onClose)
+  }
+
+  function handleRollDice() {
+    if (deckRef.current.length === 0) {
+      deckRef.current = createDeck(lastQuestionRef.current)
+    }
+    const next = deckRef.current.pop()
+    lastQuestionRef.current = next
+    setQuestion(next)
+    setError('')
+
+    gsap.fromTo(
+      diceRef.current,
+      { rotation: 0, scale: 0.8 },
+      { rotation: 360, scale: 1, duration: 0.6, ease: 'back.out(1.6)' }
+    )
+
+    // The question is rolled; the answer choices stay the poster's to write.
+    const firstEmpty = [
+      ...sheetRef.current.querySelectorAll('.modal-option__input'),
+    ].find((input) => !input.value)
+    firstEmpty?.focus()
   }
 
   function handleOptionChange(index, value) {
@@ -165,18 +191,37 @@ function CreatePollModal({ onClose, onSubmit }) {
           </p>
         ) : (
           <form onSubmit={handleSubmit}>
-            <input
-              type="text"
-              className="modal-sheet__title-input"
-              placeholder="Title of poll"
-              value={question}
-              onChange={(e) => {
-                setQuestion(e.target.value)
-                setError('')
-              }}
-              maxLength={140}
-              autoFocus
-            />
+            <div className="modal-sheet__title">
+              <input
+                type="text"
+                className="modal-sheet__title-input"
+                placeholder="Title of poll"
+                value={question}
+                onChange={(e) => {
+                  setQuestion(e.target.value)
+                  setError('')
+                }}
+                maxLength={140}
+                autoFocus
+              />
+              <button
+                ref={diceRef}
+                type="button"
+                className="modal-sheet__dice"
+                onClick={handleRollDice}
+                aria-label="Pick a random question"
+                title="Pick a random question"
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                  <rect x="3.5" y="3.5" width="17" height="17" rx="4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                  <circle cx="8.5" cy="8.5" r="1.4" fill="currentColor" />
+                  <circle cx="15.5" cy="8.5" r="1.4" fill="currentColor" />
+                  <circle cx="12" cy="12" r="1.4" fill="currentColor" />
+                  <circle cx="8.5" cy="15.5" r="1.4" fill="currentColor" />
+                  <circle cx="15.5" cy="15.5" r="1.4" fill="currentColor" />
+                </svg>
+              </button>
+            </div>
 
             <div className="modal-sheet__options">
               {options.map((value, i) => (
